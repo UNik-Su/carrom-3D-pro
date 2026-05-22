@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hyper-Realistic 3D Carrom Pro Simulator</title>
+    <style>
+        :root {
+            --bg-color: #050811;
+            --panel-color: rgba(13, 20, 38, 0.88);
+            --accent-gold: #ffcc00;
+            --accent-cyan: #00f0ff;
+            --text-light: #f8fafc;
+            --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: var(--font-stack);
+            color: var(--text-light);
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        #menu-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(10, 15, 30, 0.99) 0%, rgba(3, 5, 12, 1) 100%);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .menu-card {
+            background: var(--panel-color);
+            padding: 48px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.7);
+            text-align: center;
+            max-width: 480px;
+            width: 92%;
+        }
+
+        h1 {
+            font-size: 2.6rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-gold), #ffffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 0.85rem;
+            margin-bottom: 36px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .config-label {
+            display: block;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .config-select {
+            background: #1e293b;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 14px;
+            border-radius: 12px;
+            width: 100%;
+            margin-bottom: 24px;
+            outline: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .config-select:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 18px 28px;
+            background: linear-gradient(135deg, #e6b800 0%, #b38f00 100%);
+            border: none;
+            border-radius: 14px;
+            color: #03050c;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(230, 184, 0, 0.35);
+        }
+
+        .hud-header {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .scoreboard {
+            background: var(--panel-color);
+            padding: 14px 28px;
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            gap: 32px;
+            align-items: center;
+            box-shadow: 0 16px 32px rgba(0,0,0,0.3);
+        }
+
+        .player-score {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .player-name {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #64748b;
+            letter-spacing: 1.5px;
+            margin-bottom: 4px;
+            transition: color 0.3s;
+        }
+
+        .player-name.active-turn {
+            color: var(--accent-cyan);
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+        }
+
+        .score-val {
+            font-size: 2.2rem;
+            font-weight: 800;
+        }
+
+        .vs-divider {
+            font-weight: 700;
+            color: rgba(255,255,255,0.15);
+            font-size: 0.9rem;
+        }
+
+        .controls-footer {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .slider-container {
+            width: 85%;
+            max-width: 580px;
+            background: var(--panel-color);
+            padding: 18px 28px;
+            border-radius: 32px;
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 16px 32px rgba(0,0,0,0.4);
+        }
+
+        .slider-label {
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            min-width: 80px;
+            color: #94a3b8;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            appearance: none;
+            -webkit-appearance: none;
+            background: #1e293b;
+            height: 8px;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent-gold);
+            cursor: pointer;
+            box-shadow: 0 0 14px rgba(255,204,0,0.6);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+        }
+
+        #notification-center {
+            position: absolute;
+            top: 22%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .game-alert {
+            background: rgba(3, 5, 12, 0.94);
+            border: 1px solid var(--accent-cyan);
+            padding: 16px 48px;
+            border-radius: 40px;
+            font-size: 1.4rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #fff;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            opacity: 0;
+            transform: scale(0.85);
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .game-alert.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        #view-modes {
+            position: absolute;
+            right: 24px;
+            top: 120px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .circle-btn {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: var(--panel-color);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            font-size: 1.3rem;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+
+        .circle-btn:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            transform: scale(1.05);
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="menu-overlay">
+        <div class="menu-card">
+            <h1>Carrom Pro 3D</h1>
+            <p class="subtitle">Next-Gen Simulation Architecture</p>
+            
+            <label class="config-label">Gameplay Profile</label>
+            <select id="game-mode-select" class="config-select">
+                <option value="vsAI">Player vs Advanced AI Match</option>
+                <option value="local2P">Local Pass & Play (2 Player)</option>
+                <option value="practice">Trick-Shot Sandbox Arena</option>
+            </select>
+
+            <label class="config-label">Strategic Intellect Level</label>
+            <select id="ai-diff-select" class="config-select">
+                <option value="0">Beginner (Basic Target Alignment)</option>
+                <option value="1">Intermediate (Calculated Direct Shots)</option>
+                <option value="2">Professional (Cushion Rebound Paths)</option>
+                <option value="3" selected>Master (Full Table Real-time Coverage)</option>
+                <option value="4">Champion (Flawless Analytical Striking)</option>
+            </select>
+
+            <button class="btn" id="btn-start-match">Launch Arena</button>
+        </div>
+    </div>
+
+    <div id="ui-layer">
+        <div class="hud-header">
+            <div class="scoreboard interactive">
+                <div class="player-score">
+                    <span id="p1-name-lbl" class="player-name active-turn">Player 1</span>
+                    <span id="p1-score-lbl" class="score-val">0</span>
+                </div>
+                <div class="vs-divider">VS</div>
+                <div class="player-score">
+                    <span id="p2-name-lbl" class="player-name">AI Engine</span>
+                    <span id="p2-score-lbl" class="score-val">0</span>
+                </div>
+            </div>
+
+            <div class="scoreboard interactive" style="gap:16px; font-size:0.85rem; font-weight:700; letter-spacing:1px; text-transform:uppercase;">
+                <div>Engine Board Matrix: <span id="board-status-lbl" style="color:var(--accent-gold)">Scanning Directory...</span></div>
+            </div>
+        </div>
+
+        <div id="view-modes" class="interactive">
+            <div class="circle-btn" id="btn-cam-top" title="Top-down View">⌸</div>
+            <div class="circle-btn" id="btn-cam-orbit" title="Orbit View">⟳</div>
+        </div>
+
+        <div class="controls-footer interactive">
+            <div class="slider-container" id="placement-slider-panel">
+                <span class="slider-label">Position</span>
+                <input type="range" id="slider-striker-pos" min="-1" max="1" step="0.001" value="0">
+            </div>
+            
+            <div class="slider-container" id="force-slider-panel" style="display:none;">
+                <span class="slider-label">Force</span>
+                <input type="range" id="slider-striker-force" min="0.1" max="1" step="0.005" value="0.5">
+                <button id="btn-fire-shot" style="background:var(--accent-cyan); border:none; padding:8px 20px; font-weight:800; border-radius:20px; cursor:pointer; color:#030512; text-transform:uppercase; letter-spacing:1px; font-size:0.85rem; box-shadow:0 0 12px rgba(0,240,255,0.4)">Strike</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification-center">
+        <div id="alert-box" class="game-alert">Pipeline Initialized</div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // PROCEDURAL PHYSICAL RESAMPLING & ENGINE CORES
+        // =========================================================================
+        class AudioSynthesisEngine {
+            constructor() { this.ctx = null; }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+            playImpact(force) {
+                this.init(); if (!this.ctx) return;
+                let volume = Math.min(force * 0.18, 1.0); if (volume < 0.01) return;
+                let osc = this.ctx.createOscillator(); let gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(175 + Math.random() * 35, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(55, this.ctx.currentTime + 0.05);
+                gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.07);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+            }
+            playPocketDrop() {
+                this.init(); if (!this.ctx) return;
+                let osc = this.ctx.createOscillator(); let gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(240, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.22);
+                gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+            }
+        }
+
+        class CarromPhysicsEngine {
+            constructor(config, audioSystem, controllerRef) {
+                this.config = config; this.audio = audioSystem; this.game = controllerRef;
+                this.bodies = []; this.isSimulationActive = false;
+            }
+            clear() { this.bodies = []; this.isSimulationActive = false; }
+            addBody(type, id, x, y, radius, mass, colorHex) {
+                let body = { type, id, x, y, vx: 0, vy: 0, radius, mass, isActive: true, colorHex, mesh: null };
+                this.bodies.push(body); return body;
+            }
+            step(dt) {
+                let subDt = dt / this.config.subSteps; let activeMoving = false;
+                for (let s = 0; s < this.config.subSteps; s++) {
+                    for (let i = 0; i < this.bodies.length; i++) {
+                        let b = this.bodies[i]; if (!b.isActive) continue;
+                        b.x += b.vx * subDt; b.y += b.vy * subDt;
+                        let speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+                        if (speed > 0) {
+                            let drop = this.config.surfaceFriction * subDt * 9.81;
+                            if (drop >= speed) { b.vx = 0; b.vy = 0; }
+                            else { b.vx -= (b.vx / speed) * drop; b.vy -= (b.vy / speed) * drop; activeMoving = true; }
+                        }
+                        let limit = this.config.playableRadius - b.radius;
+                        if (b.x < -limit) { b.x = -limit; b.vx = -b.vx * this.config.cushionRestitution; this.audio.playImpact(Math.abs(b.vx)); }
+                        if (b.x > limit)  { b.x = limit;  b.vx = -b.vx * this.config.cushionRestitution; this.audio.playImpact(Math.abs(b.vx)); }
+                        if (b.y < -limit) { b.y = -limit; b.vy = -b.vy * this.config.cushionRestitution; this.audio.playImpact(Math.abs(b.vy)); }
+                        if (b.y > limit)  { b.y = limit;  b.vy = -b.vy * this.config.cushionRestitution; this.audio.playImpact(Math.abs(b.vy)); }
+                    }
+                    for (let i = 0; i < this.bodies.length; i++) {
+                        for (let j = i + 1; j < this.bodies.length; j++) {
+                            let b1 = this.bodies[i]; let b2 = this.bodies[j]; if (!b1.isActive || !b2.isActive) continue;
+                            let dx = b2.x - b1.x; let dy = b2.y - b1.y; let dist = Math.sqrt(dx*dx + dy*dy); let minDist = b1.radius + b2.radius;
+                            if (dist < minDist) {
+                                let overlap = minDist - dist; let nx = dx / dist; let ny = dy / dist; let totalMass = b1.mass + b2.mass;
+                                b1.x -= nx * overlap * (b2.mass / totalMass); b1.y -= ny * overlap * (b2.mass / totalMass);
+                                b2.x += nx * overlap * (b1.mass / totalMass); b2.y += ny * overlap * (b1.mass / totalMass);
+                                let kx = b1.vx - b2.vx; let ky = b1.vy - b2.vy; let vn = kx * nx + ky * ny;
+                                if (vn > 0) {
+                                    let impulse = (2.0 * vn) / totalMass;
+                                    b1.vx -= impulse * b2.mass * nx; b1.vy -= impulse * b2.mass * ny;
+                                    b2.vx += impulse * b1.mass * nx; b2.vy += impulse * b1.mass * ny;
+                                    this.audio.playImpact(vn * 5.2);
+                                }
+                            }
+                        }
+                    }
+                    for (let i = 0; i < this.bodies.length; i++) {
+                        let b = this.bodies[i]; if (!b.isActive) continue;
+                        for (let p = 0; p < this.config.pocketPositions.length; p++) {
+                            let pocket = this.config.pocketPositions[p]; let pdx = b.x - pocket.x; let pdy = b.y - pocket.y;
+                            if (Math.sqrt(pdx * pdx + pdy * pdy) < this.config.pocketRadius + 0.015) {
+                                b.isActive = false; b.vx = 0; b.vy = 0; this.audio.playPocketDrop(); this.game.onPiecePocketed(b);
+                            }
+                        }
+                    }
+                }
+                this.isSimulationActive = activeMoving; return activeMoving;
+            }
+        }
+
+        class StrategicAIEngine {
+            constructor(difficulty, config, physicsEngine) {
+                this.difficulty = parseInt(difficulty); this.config = config; this.physics = physicsEngine;
+            }
+            computeOptimalShot(targetType) {
+                let targets = this.physics.bodies.filter(b => b.isActive && (b.type === targetType || b.type === 'queen'));
+                let striker = this.physics.bodies.find(b => b.type === 'striker'); if (!targets.length || !striker) return null;
+                let bestShot = null; let highestScore = -Infinity; let steps = 18; let boundMax = this.config.playableRadius * 0.65;
+                for (let i = 0; i <= steps; i++) {
+                    let testX = -boundMax + (i / steps) * (boundMax * 2);
+                    for (let t = 0; t < targets.length; t++) {
+                        let tgt = targets[t];
+                        for (let p = 0; p < this.config.pocketPositions.length; p++) {
+                            let pocket = this.config.pocketPositions[p];
+                            let dxTgtP = pocket.x - tgt.x; let dyTgtP = pocket.y - tgt.y; let lenTgtP = Math.sqrt(dxTgtP*dxTgtP + dyTgtP*dyTgtP); if (lenTgtP === 0) continue;
+                            let dirTgtPx = dxTgtP / lenTgtP; let dirTgtPy = dyTgtP / lenTgtP;
+                            let contactX = tgt.x - dirTgtPx * (striker.radius + tgt.radius); let contactY = tgt.y - dirTgtPy * (striker.radius + tgt.radius);
+                            let dxS = contactX - testX; let dyS = contactY - this.config.baselineY; let lenS = Math.sqrt(dxS*dxS + dyS*dyS); if (lenS === 0) continue;
+                            let dirSx = dxS / lenS; let dirSy = dyS / lenS; if (dirSy < 0.15) continue;
+                            let alignmentDot = dirSx * dirTgtPx + dirSy * dirTgtPy;
+                            let currentScore = (alignmentDot * 130) - ((lenS + lenTgtP) * 7.5); if (tgt.type === 'queen') currentScore += 35;
+                            if (currentScore > highestScore) {
+                                highestScore = currentScore; let err = Math.max(0, (4 - this.difficulty) * 0.022);
+                                bestShot = {
+                                    placementX: testX, aimDirX: dirSx + (Math.random() - 0.5) * err, aimDirY: dirSy + (Math.random() - 0.5) * err,
+                                    force: Math.min(2.5 + lenS * 4.0, 9.0) * (0.82 + (this.difficulty * 0.045))
+                                };
+                            }
+                        }
+                    }
+                }
+                if (!bestShot) {
+                    let tgt = targets[0]; let dx = tgt.x - 0; let dy = tgt.y - this.config.baselineY; let d = Math.sqrt(dx*dx + dy*dy);
+                    bestShot = { placementX: 0, aimDirX: dx/d, aimDirY: dy/d, force: 5.2 };
+                }
+                return bestShot;
+            }
+        }
+
+        class CarromVisualScene {
+            constructor(config, controllerRef) {
+                this.config = config; this.game = controllerRef; this.container = document.getElementById('canvas-container');
+                this.scene = null; this.camera = null; this.renderer = null; this.controls = null; this.aimLine = null; this.assetLoaded = false;
+            }
+            init() {
+                this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x04060b);
+                this.camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.05, 120); this.setCameraProfile('top');
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+                this.renderer.setSize(window.innerWidth, window.innerHeight); this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
+                this.container.appendChild(this.renderer.domElement);
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true; this.controls.dampingFactor = 0.05; this.controls.maxPolarAngle = Math.PI / 2 - 0.04;
+                this.setupEnvironmentLighting(); this.generateVisualTrajectoryIndicator(); this.executeAssetPipelineDiscovery();
+                window.addEventListener('resize', () => this.onWindowResize());
+            }
+            setupEnvironmentLighting() {
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+                let overheadLight = new THREE.DirectionalLight(0xfffdf4, 1.4); overheadLight.position.set(0, 10, 1);
+                overheadLight.castShadow = true; overheadLight.shadow.mapSize.width = 2048; overheadLight.shadow.mapSize.height = 2048;
+                overheadLight.shadow.bias = -0.0004; this.scene.add(overheadLight);
+                let glowRim = new THREE.PointLight(0x00f0ff, 0.45, 12); glowRim.position.set(4, 3, 4); this.scene.add(glowRim);
+            }
+            generateVisualTrajectoryIndicator() {
+                const mat = new THREE.LineBasicMaterial({ color: 0x00f0ff, linewidth: 2, transparent: true, opacity: 0.8 });
+                const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-2)]);
+                this.aimLine = new THREE.Line(geo, mat); this.aimLine.visible = false; this.scene.add(this.aimLine);
+            }
+            setCameraProfile(mode) {
+                if (mode === 'top') { this.camera.position.set(0, 5.2, 0.01); if (this.controls) this.controls.target.set(0,0,0); }
+                else if (mode === 'orbit') { this.camera.position.set(0, 2.8, 3.8); if (this.controls) this.controls.target.set(0,0,0); }
+            }
+            executeAssetPipelineDiscovery() {
+                const loader = new THREE.GLTFLoader(); document.getElementById('board-status-lbl').innerText = "Streaming Asset...";
+                loader.load('assets/carrom_board.glb',
+                    (gltf) => { this.scene.add(gltf.scene); this.processModelGeometryMetrics(gltf.scene); },
+                    (xhr) => { let pct = Math.round((xhr.loaded / xhr.total) * 100); if (!isNaN(pct)) document.getElementById('board-status-lbl').innerText = `Loading: ${pct}%`; },
+                    (error) => { console.warn("External GLB file absent. Spawning procedural layout standard."); this.constructProceduralFallbackBoard(); }
+                );
+            }
+            processModelGeometryMetrics(modelScene) {
+                // Autonomic Real-time Boundary Re-calculation Passes Map
+                const box = new THREE.Box3().setFromObject(modelScene); const size = new THREE.Vector3(); box.getSize(size);
+                let derivedMaxExtent = Math.max(size.x, size.z) / 2; this.config.boardSize = derivedMaxExtent * 2;
+                
+                this.config.playableRadius = derivedMaxExtent * 0.85;
+                this.config.baselineY = -(this.config.playableRadius * 0.70);
+                this.config.pocketRadius = derivedMaxExtent * 0.065;
+                
+                let pOffset = this.config.playableRadius * 0.94;
+                this.config.pocketPositions = [
+                    { x: -pOffset, y: -pOffset }, { x: pOffset, y: -pOffset },
+                    { x: -pOffset, y: pOffset },  { x: pOffset, y: pOffset }
+                ];
+                modelScene.traverse((node) => {
+                    if (node.isMesh) {
+                        node.castShadow = true; node.receiveShadow = true;
+                        if (node.material) { node.material.roughness = Math.min(node.material.roughness, 0.22); node.material.metalness = Math.max(node.material.metalness, 0.08); }
+                    }
+                });
+                document.getElementById('board-status-lbl').innerText = `Asset Active [${this.config.boardSize.toFixed(2)}m]`;
+                document.getElementById('board-status-lbl').style.color = "#00f0ff"; this.assetLoaded = true; this.game.onPipelineStandardized();
+            }
+            constructProceduralFallbackBoard() {
+                let frameGeo = new THREE.BoxGeometry(4.4, 0.18, 4.4); let frameMat = new THREE.MeshStandardMaterial({ color: 0x2b1810, roughness: 0.38 });
+                let frameMesh = new THREE.Mesh(frameGeo, frameMat); frameMesh.position.y = -0.09; frameMesh.receiveShadow = true; this.scene.add(frameMesh);
+                let boardGeo = new THREE.BoxGeometry(3.9, 0.02, 3.9); let boardMat = new THREE.MeshStandardMaterial({ color: 0xdfb782, roughness: 0.14 });
+                let boardMesh = new THREE.Mesh(boardGeo, boardMat); boardMesh.position.y = -0.01; boardMesh.receiveShadow = true; this.scene.add(boardMesh);
+                this.config.playableRadius = 1.85; this.config.baselineY = -1.30; this.config.pocketRadius = 0.143;
+                let pOffset = 1.74;
+                this.config.pocketPositions = [ { x: -pOffset, y: -pOffset }, { x: pOffset, y: -pOffset }, { x: -pOffset, y: pOffset }, { x: pOffset, y: pOffset } ];
+                this.config.pocketPositions.forEach(p => {
+                    let hole = new THREE.Mesh(new THREE.CylinderGeometry(this.config.pocketRadius, this.config.pocketRadius, 0.03, 24), new THREE.MeshBasicMaterial({ color: 0x020408 }));
+                    hole.position.set(p.x, -0.005, p.y); this.scene.add(hole);
+                });
+                document.getElementById('board-status-lbl').innerText = "Procedural Rig Loaded"; this.assetLoaded = true; this.game.onPipelineStandardized();
+            }
+            spawnPieceVisualMesh(body) {
+                let h = (body.type === 'striker') ? 0.055 : 0.045;
+                let mesh = new THREE.Mesh(new THREE.CylinderGeometry(body.radius, body.radius, h, 24), 
+                    (body.type==='striker') ? new THREE.MeshStandardMaterial({ color: body.colorHex, roughness: 0.05, metalness: 0.85, clearcoat: 1.0 }) :
+                    (body.type==='queen') ? new THREE.MeshStandardMaterial({ color: body.colorHex, roughness: 0.18, metalness: 0.25 }) :
+                    new THREE.MeshStandardMaterial({ color: body.colorHex, roughness: 0.16, metalness: 0.05 }));
+                mesh.castShadow = true; mesh.receiveShadow = true; this.scene.add(mesh); body.mesh = mesh; this.syncMeshPosition(body);
+            }
+            syncMeshPosition(body) { if (body.mesh) { body.mesh.position.set(body.x, 0.022, body.y); body.mesh.visible = body.isActive; } }
+            updateAimLine(striker, mouseWorldPoint) {
+                if (!striker || !this.aimLine.visible) return;
+                let dx = mouseWorldPoint.x - striker.x; let dy = mouseWorldPoint.z - striker.y; let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > 0.04) {
+                    let pos = this.aimLine.geometry.attributes.position.array;
+                    pos[0] = striker.x; pos[1] = 0.025; pos[2] = striker.y;
+                    pos[3] = striker.x + (dx / dist) * 1.6; pos[4] = 0.025; pos[5] = striker.y + (dy / dist) * 1.6;
+                    this.aimLine.geometry.attributes.position.needsUpdate = true;
+                }
+            }
+            onWindowResize() { this.camera.aspect = window.innerWidth / window.innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(window.innerWidth, window.innerHeight); }
+            render() { this.controls.update(); this.renderer.render(this.scene, this.camera); }
+        }
+  // =========================================================================
+        // CORE MAIN SIMULATION STATE MANAGER
+        // =========================================================================
+        class GameMatchController {
+            constructor() {
+                this.config = {
+                    boardSize: 4.4, playableRadius: 1.85, cushionRestitution: 0.85, surfaceFriction: 0.015, subSteps: 16, pocketRadius: 0.143,
+                    pocketPositions: [], baselineY: -1.30, strikerRadius: 0.11, strikerMass: 3.2, coinRadius: 0.085, coinMass: 1.0, queenMass: 1.05
+                };
+                this.audio = new AudioSynthesisEngine(); this.physics = new CarromPhysicsEngine(this.config, this.audio, this);
+                this.visuals = new CarromVisualScene(this.config, this); this.ai = null;
+                this.mode = 'vsAI'; this.scores = { p1: 0, p2: 0 }; this.currentTurn = 1; this.gameState = 'menu';
+                this.allocatedColor = { 1: null, 2: null }; this.strikerBody = null;
+                this.turnPocketedCount = 0; this.queenPocketedThisTurn = false; this.queenCovered = false;
+                this.raycaster = new THREE.Raycaster(); this.mouse = new THREE.Vector2(); this.dummyPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+            }
+            init() { this.visuals.init(); this.bindUIInputEvents(); this.animate(); }
+            bindUIInputEvents() {
+                document.getElementById('btn-start-match').addEventListener('click', () => this.setupMatchSession());
+                document.getElementById('btn-cam-top').addEventListener('click', () => this.visuals.setCameraProfile('top'));
+                document.getElementById('btn-cam-orbit').addEventListener('click', () => this.visuals.setCameraProfile('orbit'));
+                document.getElementById('slider-striker-pos').addEventListener('input', (e) => {
+                    if (this.gameState === 'placement' && this.strikerBody) {
+                        this.strikerBody.x = parseFloat(e.target.value) * (this.config.playableRadius * 0.65); this.visuals.syncMeshPosition(this.strikerBody);
+                    }
+                });
+                window.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+                window.addEventListener('pointermove', (e) => this.onPointerMove(e));
+                document.getElementById('btn-fire-shot').addEventListener('click', () => {
+                    if (this.gameState === 'aiming') this.executeStrikeLaunch(parseFloat(document.getElementById('slider-striker-force').value) * 9.2);
+                });
+            }
+            onPipelineStandardized() { this.showAlert("Asset Architecture Synchronized"); }
+            setupMatchSession() {
+                this.mode = document.getElementById('game-mode-select').value;
+                this.ai = new StrategicAIEngine(document.getElementById('ai-diff-select').value, this.config, this.physics);
+                this.scores = { p1: 0, p2: 0 }; this.currentTurn = 1; this.allocatedColor = { 1: null, 2: null }; this.queenCovered = false;
+                document.getElementById('p1-score-lbl').innerText = "0"; document.getElementById('p2-score-lbl').innerText = "0";
+                document.getElementById('p2-name-lbl').innerText = (this.mode === 'vsAI') ? "AI Engine" : "Player 2";
+                document.getElementById('menu-overlay').style.opacity = '0'; setTimeout(() => document.getElementById('menu-overlay').style.display = 'none', 600);
+                this.generateCarromLayout(); this.enterPlacementPhase();
+            }
+            generateCarromLayout() {
+                this.physics.clear(); let removable = [];
+                this.visuals.scene.traverse(n => { if(n.isMesh && !n.receiveShadow && n.geometry && n.geometry.type==='CylinderGeometry') removable.push(n); });
+                removable.forEach(m => this.visuals.scene.remove(m));
+                this.strikerBody = this.physics.addBody('striker', 'striker', 0, this.config.baselineY, this.config.strikerRadius, this.config.strikerMass, 0xff005d);
+                this.visuals.spawnPieceVisualMesh(this.strikerBody);
+                this.visuals.spawnPieceVisualMesh(this.physics.addBody('queen', 'queen', 0, 0, this.config.coinRadius, this.config.queenMass, 0xff1a1a));
+                let ring1 = this.config.coinRadius * 2.4;
+                for (let i = 0; i < 6; i++) {
+                    let ang = (i * Math.PI / 3); let type = (i % 2 === 0) ? 'white' : 'black';
+                    this.visuals.spawnPieceVisualMesh(this.physics.addBody(type, `r1_${i}`, Math.cos(ang)*ring1, Math.sin(ang)*ring1, this.config.coinRadius, this.config.coinMass, (type==='white')?0xffffff:0x12151c));
+                }
+                let ring2 = this.config.coinRadius * 4.6;
+                for (let i = 0; i < 12; i++) {
+                    let ang = (i * Math.PI / 6); let type = (i % 2 === 0) ? 'black' : 'white';
+                    this.visuals.spawnPieceVisualMesh(this.physics.addBody(type, `r2_${i}`, Math.cos(ang)*ring2, Math.sin(ang)*ring2, this.config.coinRadius, this.config.coinMass, (type==='white')?0xffffff:0x12151c));
+                }
+            }
+            enterPlacementPhase() {
+                this.gameState = 'placement'; this.turnPocketedCount = 0; this.queenPocketedThisTurn = false;
+                this.strikerBody.isActive = true; this.strikerBody.x = 0; this.strikerBody.y = this.config.baselineY; this.strikerBody.vx = 0; this.strikerBody.vy = 0;
+                this.visuals.syncMeshPosition(this.strikerBody);
+                document.getElementById('placement-slider-panel').style.display = 'flex'; document.getElementById('force-slider-panel').style.display = 'none';
+                document.getElementById('slider-striker-pos').value = 0; this.updateHUDTurnGlows();
+                if (this.mode === 'vsAI' && this.currentTurn === 2) setTimeout(() => this.processAILogicTurn(), 1200);
+            }
+            processAILogicTurn() {
+                let targetColor = this.allocatedColor[2] || 'white'; let decision = this.ai.computeOptimalShot(targetColor);
+                if (decision) {
+                    this.strikerBody.x = decision.placementX; this.visuals.syncMeshPosition(this.strikerBody);
+                    setTimeout(() => {
+                        this.strikerBody.vx = decision.aimDirX * decision.force; this.strikerBody.vy = decision.aimDirY * decision.force;
+                        document.getElementById('placement-slider-panel').style.display = 'none'; this.gameState = 'resolving'; this.physics.isSimulationActive = true;
+                    }, 1000);
+                }
+            }
+            onPointerDown(e) {
+                if (this.gameState !== 'placement' || (this.mode === 'vsAI' && this.currentTurn === 2) || e.clientY > window.innerHeight * 0.76) return;
+                let worldPt = this.getMouseWorldIntersection(e);
+                if (worldPt && Math.sqrt(Math.pow(worldPt.x - this.strikerBody.x, 2) + Math.pow(worldPt.z - this.strikerBody.y, 2)) < 0.6) {
+                    this.gameState = 'aiming'; this.visuals.aimLine.visible = true;
+                    document.getElementById('placement-slider-panel').style.display = 'none'; document.getElementById('force-slider-panel').style.display = 'flex';
+                    this.visuals.updateAimLine(this.strikerBody, worldPt);
+                }
+            }
+            onPointerMove(e) {
+                if (this.gameState !== 'aiming' || (this.mode === 'vsAI' && this.currentTurn === 2)) return;
+                let worldPt = this.getMouseWorldIntersection(e); if (worldPt) this.visuals.updateAimLine(this.strikerBody, worldPt);
+            }
+            executeStrikeLaunch(force) {
+                let pos = this.visuals.aimLine.geometry.attributes.position.array;
+                let dx = pos[3] - pos[0]; let dy = pos[5] - pos[2]; let len = Math.sqrt(dx*dx + dy*dy);
+                if (len > 0) {
+                    this.strikerBody.vx = (dx / len) * force; this.strikerBody.vy = (dy / len) * force;
+                    this.visuals.aimLine.visible = false; document.getElementById('force-slider-panel').style.display = 'none';
+                    this.gameState = 'resolving'; this.physics.isSimulationActive = true;
+                }
+            }
+            onPiecePocketed(body) {
+                this.turnPocketedCount++; let pKey = (this.currentTurn === 1) ? 'p1' : 'p2'; let oppKey = (this.currentTurn === 1) ? 'p2' : 'p1';
+                if (body.type === 'queen') { this.queenPocketedThisTurn = true; this.showAlert("Queen Potted! Cover Required."); return; }
+                if (!this.allocatedColor[this.currentTurn]) {
+                    this.allocatedColor[this.currentTurn] = body.type; this.allocatedColor[(this.currentTurn===1)?2:1] = (body.type==='white')?'black':'white';
+                    this.showAlert(`Color Assigned: ${body.type.toUpperCase()}`);
+                }
+                if (body.type === this.allocatedColor[this.currentTurn]) { this.scores[pKey]++; document.getElementById(`${pKey}-score-lbl`).innerText = this.scores[pKey]; } 
+                else { this.scores[oppKey]++; document.getElementById(`${oppKey}-score-lbl`).innerText = this.scores[oppKey]; this.showAlert("Opponent Coin Sunk!"); }
+            }
+            evaluateTurnEndConditions() {
+                if (!this.strikerBody.isActive) { this.showAlert("Striker Foul!"); this.switchTurns(); this.enterPlacementPhase(); return; }
+                if (this.queenPocketedThisTurn) { this.queenCovered = true; this.showAlert("Queen Covered!"); }
+                if (this.turnPocketedCount > 0) { this.enterPlacementPhase(); } else { this.switchTurns(); this.enterPlacementPhase(); }
+                this.checkMatchWinStatus();
+            }
+            switchTurns() { this.currentTurn = (this.currentTurn === 1) ? 2 : 1; }
+            updateHUDTurnGlows() {
+                if (this.currentTurn === 1) { document.getElementById('p1-name-lbl').classList.add('active-turn'); document.getElementById('p2-name-lbl').classList.remove('active-turn'); } 
+                else { document.getElementById('p1-name-lbl').classList.remove('active-turn'); document.getElementById('p2-name-lbl').classList.add('active-turn'); }
+            }
+            checkMatchWinStatus() {
+                let rem = this.physics.bodies.filter(b => b.isActive && (b.type === 'white' || b.type === 'black'));
+                if (rem.length === 0) {
+                    this.gameState = 'gameover'; let win = (this.scores.p1 > this.scores.p2) ? "Player 1" : (this.mode==='vsAI'?"AI Engine":"Player 2");
+                    this.showAlert(`Match Won by ${win}!`);
+                    setTimeout(() => { document.getElementById('menu-overlay').style.display = 'flex'; document.getElementById('menu-overlay').style.opacity = '1'; }, 5000);
+                }
+            }
+            getMouseWorldIntersection(e) {
+                this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1; this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                this.raycaster.setFromCamera(this.mouse, this.visuals.camera); let vec = new THREE.Vector3();
+                if (this.raycaster.ray.intersectPlane(this.dummyPlane, vec)) return vec; return null;
+            }
+            showAlert(msg) { let box = document.getElementById('alert-box'); box.innerText = msg; box.classList.add('show'); setTimeout(() => box.classList.remove('show'), 2200); }
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                if (this.gameState === 'resolving') {
+                    if (!this.physics.step(1 / 60)) this.evaluateTurnEndConditions();
+                    this.physics.bodies.forEach(b => this.visuals.syncMeshPosition(b));
+                }
+                this.visuals.render();
+            }
+        }
+
+        const gameController = new GameMatchController();
+        window.addEventListener('DOMContentLoaded', () => gameController.init());
+    </script>
+</body>
+</html>
